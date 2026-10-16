@@ -13,50 +13,50 @@ const LEVEL_CONFIGS = [
     title: "LEVEL 1: CLASSROOM OUTBREAK",
     difficulty: "Easy",
     badgeClass: "easy",
-    timeLimit: 200,          // 3 minutes 20s
+    timeLimit: 220,          // 3 minutes 40s (Forgiving & exploration friendly)
     zombieCount: 3,
-    zombieDamage: 16,
-    zombiePatrolSpeed: 1.15,
-    zombieChaseSpeed: 1.95,
-    noiseRadiusWalk: 110,
-    noiseRadiusSprint: 280,
-    flashlightBeamDist: 320,
-    flashlightBeamAngle: 0.52,
-    description: "Initial containment breach. Evacuate Classroom 101, locate the Lab Keycard, and reach the emergency exit.",
-    nextSectorHint: "Power grid failure detected in Sector 2. Expect pitch-black corridors and faster stalkers."
+    zombieDamage: 12,        // Low bite damage
+    zombiePatrolSpeed: 1.0,
+    zombieChaseSpeed: 1.70,  // Slower than player walk, easy to outrun!
+    noiseRadiusWalk: 90,
+    noiseRadiusSprint: 240,
+    flashlightBeamDist: 340, // Wide bright beam
+    flashlightBeamAngle: 0.55,
+    description: "Initial containment breach. 3 slow wandering infected. Evacuate Classroom 101, locate the Lab Keycard, and reach the exit.",
+    nextSectorHint: "Power grid failure detected in Sector 2! Expect blackout conditions and faster stalkers."
   },
   {
     level: 2,
     title: "LEVEL 2: THE BLACKOUT",
     difficulty: "Medium",
     badgeClass: "medium",
-    timeLimit: 160,          // 2 minutes 40s
+    timeLimit: 160,          // 2 minutes 40s (Medium pressure)
     zombieCount: 5,
     zombieDamage: 22,
     zombiePatrolSpeed: 1.35,
-    zombieChaseSpeed: 2.35,
-    noiseRadiusWalk: 125,
-    noiseRadiusSprint: 380,
-    flashlightBeamDist: 260,
+    zombieChaseSpeed: 2.35,  // Fast stalkers! Faster than walk (requires sprint management)
+    noiseRadiusWalk: 120,
+    noiseRadiusSprint: 360,  // Stalkers hear footsteps through walls
+    flashlightBeamDist: 260, // Narrow amber beam
     flashlightBeamAngle: 0.46,
-    description: "Generators offline. Auxiliary emergency lighting only. Aggressive infected roaming the main corridor.",
-    nextSectorHint: "Quarantine decontamination sequence initiated in Sector 3! Lethal mutated specimens incoming."
+    description: "Generators offline. Auxiliary amber alarms only. 5 aggressive stalkers roaming the server corridors. Conserve stamina!",
+    nextSectorHint: "QUARANTINE PURGE PROTOCOL ACTIVE! 7 mutated berserkers on high alert in Sector 3."
   },
   {
     level: 3,
     title: "LEVEL 3: QUARANTINE PURGE",
     difficulty: "Hard",
     badgeClass: "hard",
-    timeLimit: 120,          // 2 minutes flat!
+    timeLimit: 100,          // 1 minute 40s (Pure adrenaline panic!)
     zombieCount: 7,
-    zombieDamage: 30,
-    zombiePatrolSpeed: 1.50,
-    zombieChaseSpeed: 2.70,
+    zombieDamage: 32,        // Lethal! 3 bites and you're dead
+    zombiePatrolSpeed: 1.60,
+    zombieChaseSpeed: 2.75,  // Near player sprint speed!
     noiseRadiusWalk: 140,
-    noiseRadiusSprint: 460,
-    flashlightBeamDist: 220,
-    flashlightBeamAngle: 0.42,
-    description: "Quarantine purge active! A swarm of mutated stalkers has overrun the sector. Escape or be erased!",
+    noiseRadiusSprint: 460,  // Sprinting alerts the entire facility
+    flashlightBeamDist: 210, // Short claustrophobic beam
+    flashlightBeamAngle: 0.40,
+    description: "Quarantine decontamination purge active! 7 mutated berserkers hunting under flashing red sirens. Escape before purge!",
     nextSectorHint: ""
   }
 ];
@@ -107,13 +107,45 @@ function preloadPlayerSprites() {
 }
 preloadPlayerSprites();
 
+// Preload Campus Environment Textures from uploaded photos
+const envTextures = {
+  floorPattern: null,
+  floorImg: null,
+  deskImg: null,
+  doorImg: null
+};
+
+function initEnvTextures() {
+  if (typeof ENV_ASSETS !== 'undefined') {
+    if (ENV_ASSETS.floorTile) {
+      envTextures.floorImg = new Image();
+      envTextures.floorImg.src = ENV_ASSETS.floorTile;
+      envTextures.floorImg.onload = () => {
+        // Create seamless repeating canvas pattern
+        envTextures.floorPattern = ctx.createPattern(envTextures.floorImg, 'repeat');
+      };
+    }
+    if (ENV_ASSETS.deskTop) {
+      envTextures.deskImg = new Image();
+      envTextures.deskImg.src = ENV_ASSETS.deskTop;
+    }
+    if (ENV_ASSETS.doorTexture) {
+      envTextures.doorImg = new Image();
+      envTextures.doorImg.src = ENV_ASSETS.doorTexture;
+    }
+  }
+}
+initEnvTextures();
+
 /* ====================================================================
  * 1. WEB AUDIO SYNTHESIZER (Pure Code - No External Files Needed)
  * ==================================================================== */
 class SoundEngine {
   constructor() {
     this.ctx = null;
+    this.masterGain = null;
     this.muted = false;
+    this.volume = 0.8;
   }
 
   init() {
@@ -121,6 +153,9 @@ class SoundEngine {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+        this.masterGain.connect(this.ctx.destination);
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
@@ -128,9 +163,63 @@ class SoundEngine {
     }
   }
 
+  setVolume(val) {
+    this.volume = Math.max(0, Math.min(1, val));
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
+    }
+  }
+
   toggleMute() {
     this.muted = !this.muted;
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setValueAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime);
+    }
     return this.muted;
+  }
+
+  getDestination() {
+    return this.masterGain || (this.ctx ? this.ctx.destination : null);
+  }
+
+  playMenuHover() {
+    if (this.muted || !this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(540, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(740, this.ctx.currentTime + 0.04);
+
+      gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+
+      osc.connect(gain);
+      gain.connect(this.getDestination());
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.05);
+    } catch (e) {}
+  }
+
+  playMenuSelect() {
+    if (this.muted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      [440, 880].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.06);
+
+        gain.gain.setValueAtTime(0.18, now + i * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.12);
+
+        osc.connect(gain);
+        gain.connect(this.getDestination());
+        osc.start(now + i * 0.06);
+        osc.stop(now + i * 0.06 + 0.14);
+      });
+    } catch (e) {}
   }
 
   playStep(isSprint = false) {
@@ -146,7 +235,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start();
       osc.stop(this.ctx.currentTime + 0.09);
     } catch (e) {}
@@ -174,7 +263,7 @@ class SoundEngine {
 
       whiteNoise.connect(filter);
       filter.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       whiteNoise.start();
     } catch (e) {}
   }
@@ -192,7 +281,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start();
       osc.stop(this.ctx.currentTime + 0.42);
     } catch (e) {}
@@ -212,7 +301,7 @@ class SoundEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.2);
 
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getDestination());
         osc.start(now + i * 0.08);
         osc.stop(now + i * 0.08 + 0.22);
       });
@@ -233,7 +322,7 @@ class SoundEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.25);
 
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getDestination());
         osc.start(now + i * 0.1);
         osc.stop(now + i * 0.1 + 0.27);
       });
@@ -254,7 +343,7 @@ class SoundEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.3);
 
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getDestination());
         osc.start(now + i * 0.1);
         osc.stop(now + i * 0.1 + 0.32);
       });
@@ -276,7 +365,7 @@ class SoundEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.35);
 
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getDestination());
         osc.start(now + i * 0.12);
         osc.stop(now + i * 0.12 + 0.38);
       });
@@ -298,7 +387,7 @@ class SoundEngine {
         gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.2 + 0.4);
 
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getDestination());
         osc.start(now + i * 0.2);
         osc.stop(now + i * 0.2 + 0.45);
       });
@@ -318,7 +407,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
       osc.start();
       osc.stop(this.ctx.currentTime + 0.13);
     } catch (e) {}
@@ -367,87 +456,244 @@ class CampusMap {
     const W = CONFIG.WORLD_WIDTH;
     const H = CONFIG.WORLD_HEIGHT;
 
-    // Outer Boundary Walls
+    // Outer Boundary Walls (Consistent across all sectors)
     this.addWall(0, 0, W, 25);
     this.addWall(0, H - 25, W, 25);
     this.addWall(0, 0, 25, H);
     this.addWall(W - 25, 0, 25, H);
 
-    // Room Definitions
+    if (this.levelNum === 1) {
+      this.setupLevel1();
+    } else if (this.levelNum === 2) {
+      this.setupLevel2();
+    } else {
+      this.setupLevel3();
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * LEVEL 1 (EASY): Classroom Outbreak - Open lecture hall & wide halls
+   * ------------------------------------------------------------------ */
+  setupLevel1() {
     this.rooms = [
       { name: "CLASSROOM 101 (Safe Zone)", x: 25, y: 25, w: 350, h: 280, color: "#141920" },
-      { name: "RESEARCH LAB B (Infected)", x: 820, y: 25, w: 455, h: 320, color: "#101e18" },
-      { name: "INFIRMARY / MEDICAL BAY", x: 25, y: 460, w: 350, h: 415, color: "#181a1d" },
+      { name: "SECURITY & FACULTY WING", x: 820, y: 25, w: 455, h: 320, color: "#101e18" },
+      { name: "STUDENT INFIRMARY", x: 25, y: 460, w: 350, h: 415, color: "#181a1d" },
       { name: "CAMPUS EMERGENCY EXIT", x: 850, y: 550, w: 425, h: 325, color: "#211516" },
-      { name: "MAIN CORRIDORS", x: 375, y: 150, w: 445, h: 560, color: "#0c0f13" }
+      { name: "MAIN CORRIDORS", x: 375, y: 120, w: 445, h: 590, color: "#0c0f13" }
     ];
 
-    // Classroom Walls & Furniture
+    // Classroom Walls & Desks
     this.addWall(375, 25, 20, 105);
     this.addWall(375, 230, 20, 75);
     this.addWall(25, 305, 370, 20);
 
-    this.addDecor({ type: "chalkboard", x: 60, y: 27, w: 200, h: 10, text: `SECTOR ${this.levelNum} - EVACUATE IMMEDIATELY` });
+    this.addDecor({ type: "chalkboard", x: 60, y: 27, w: 220, h: 10, text: "SECTOR 1: CLASSROOM OUTBREAK [EASY - TUTORIAL]" });
     this.addDecor({ type: "teacher_desk", x: 130, y: 70, w: 80, h: 35 });
-    this.addObstacle(70, 140, 65, 30);
-    this.addObstacle(170, 140, 65, 30);
-    this.addObstacle(270, 140, 65, 30);
-    this.addObstacle(70, 210, 65, 30);
-    this.addObstacle(170, 210, 65, 30);
-    this.addObstacle(270, 210, 65, 30);
+    this.addObstacle(70, 140, 65, 30, "desk");
+    this.addObstacle(170, 140, 65, 30, "desk");
+    this.addObstacle(270, 140, 65, 30, "desk");
+    this.addObstacle(70, 210, 65, 30, "desk");
+    this.addObstacle(170, 210, 65, 30, "desk");
+    this.addObstacle(270, 210, 65, 30, "desk");
 
-    // Research Lab B Walls & Tables
+    // Security Wing Walls & Desks
     this.addWall(820, 25, 20, 105);
     this.addWall(820, 230, 20, 115);
     this.addWall(820, 345, 455, 20);
 
-    this.addObstacle(880, 80, 150, 40);
-    this.addObstacle(1070, 80, 140, 40);
-    this.addObstacle(880, 180, 140, 40);
-    this.addObstacle(1060, 180, 150, 40);
-    this.addObstacle(940, 260, 180, 40);
-    this.addDecor({ type: "biohazard_tank", x: 1200, y: 260, r: 24 });
+    this.addObstacle(880, 80, 150, 40, "desk");
+    this.addObstacle(1070, 80, 140, 40, "desk");
+    this.addObstacle(880, 180, 140, 40, "desk");
+    this.addObstacle(1060, 180, 150, 40, "desk");
+    this.addObstacle(940, 260, 180, 40, "desk");
 
-    // Medical Bay Walls & Beds
+    // Student Infirmary Walls & Cots
     this.addWall(25, 460, 370, 20);
     this.addWall(375, 460, 20, 80);
     this.addWall(375, 640, 20, 235);
 
-    this.addObstacle(60, 520, 45, 75);
-    this.addObstacle(140, 520, 45, 75);
-    this.addObstacle(60, 670, 45, 75);
-    this.addObstacle(140, 670, 45, 75);
-    this.addObstacle(270, 750, 85, 35);
+    this.addObstacle(60, 520, 45, 75, "cot");
+    this.addObstacle(140, 520, 45, 75, "cot");
+    this.addObstacle(60, 670, 45, 75, "cot");
+    this.addObstacle(140, 670, 45, 75, "cot");
+    this.addObstacle(270, 750, 85, 35, "desk");
 
     // Exit Gate Walls
     this.addWall(820, 550, 110, 20);
     this.addWall(1040, 550, 235, 20);
     this.addWall(820, 550, 20, 325);
 
-    // Corridor Pillars
-    this.addObstacle(560, 260, 40, 40);
+    // Wide Corridor Pillars
+    this.addObstacle(560, 250, 40, 40);
     this.addObstacle(560, 420, 40, 40);
-    this.addObstacle(560, 580, 40, 40);
+    this.addObstacle(560, 590, 40, 40);
 
-    // Atmospheric Lights per level
-    const lightMultiplier = this.levelNum === 1 ? 1.0 : (this.levelNum === 2 ? 0.75 : 0.55);
+    // Warm, welcoming lighting for easy exploration
     this.lights = [
-      { x: 200, y: 150, radius: 160 * lightMultiplier, color: "rgba(255, 230, 180, 0.15)", flicker: 0.05 },
-      { x: 580, y: 180, radius: 140 * lightMultiplier, color: "rgba(255, 70, 70, 0.18)", flicker: 0.25 },
-      { x: 580, y: 380, radius: 150 * lightMultiplier, color: "rgba(255, 200, 100, 0.14)", flicker: 0.12 },
-      { x: 580, y: 640, radius: 150 * lightMultiplier, color: "rgba(255, 70, 70, 0.18)", flicker: 0.30 },
-      { x: 1050, y: 160, radius: 180 * lightMultiplier, color: "rgba(100, 240, 180, 0.18)", flicker: 0.15 },
-      { x: 200, y: 600, radius: 170 * lightMultiplier, color: "rgba(180, 230, 255, 0.15)", flicker: 0.08 },
-      { x: 1050, y: 700, radius: 200 * lightMultiplier, color: "rgba(255, 100, 100, 0.20)", flicker: 0.15 }
+      { x: 200, y: 150, radius: 190, color: "rgba(255, 235, 190, 0.18)", flicker: 0.03 },
+      { x: 580, y: 180, radius: 170, color: "rgba(255, 220, 160, 0.16)", flicker: 0.08 },
+      { x: 580, y: 380, radius: 180, color: "rgba(255, 220, 160, 0.16)", flicker: 0.05 },
+      { x: 580, y: 620, radius: 170, color: "rgba(255, 200, 140, 0.15)", flicker: 0.08 },
+      { x: 1050, y: 160, radius: 210, color: "rgba(200, 255, 220, 0.18)", flicker: 0.05 },
+      { x: 200, y: 600, radius: 190, color: "rgba(200, 230, 255, 0.16)", flicker: 0.04 },
+      { x: 1050, y: 700, radius: 220, color: "rgba(255, 120, 120, 0.20)", flicker: 0.08 }
     ];
 
-    // Floor Blood & Hazard signs
     this.decorations.push(
-      { type: "blood_stain", x: 395, y: 180, size: 28 },
-      { type: "blood_trail", x: 480, y: 180, w: 280, h: 10 },
-      { type: "blood_stain", x: 800, y: 180, size: 36 },
-      { type: "blood_stain", x: 580, y: 480, size: 40 },
+      { type: "blood_stain", x: 395, y: 180, size: 24 },
+      { type: "blood_trail", x: 480, y: 180, w: 260, h: 8 },
+      { type: "blood_stain", x: 800, y: 180, size: 30 },
+      { type: "exit_sign", x: 985, y: 535 }
+    );
+  }
+
+  /* ------------------------------------------------------------------
+   * LEVEL 2 (MEDIUM): The Blackout - Server Aisles & S-Curve Chokepoints
+   * ------------------------------------------------------------------ */
+  setupLevel2() {
+    this.rooms = [
+      { name: "SERVER CONTROL 201 (Safe Zone)", x: 25, y: 25, w: 350, h: 280, color: "#0d1117" },
+      { name: "COOLING & BACKUP POWER HUB", x: 820, y: 25, w: 455, h: 320, color: "#0d1824" },
+      { name: "ARCHIVE STORAGE & BATTERY BAY", x: 25, y: 460, w: 350, h: 415, color: "#11161d" },
+      { name: "DATA VAULT AIRLOCK EXIT", x: 850, y: 550, w: 425, h: 325, color: "#1b1411" },
+      { name: "SERVER AISLES (S-Curve Labyrinth)", x: 375, y: 120, w: 445, h: 590, color: "#080b0f" }
+    ];
+
+    // Control Room Walls & Terminal
+    this.addWall(375, 25, 20, 115);
+    this.addWall(375, 225, 20, 80);
+    this.addWall(25, 305, 370, 20);
+
+    this.addDecor({ type: "chalkboard", x: 60, y: 27, w: 240, h: 10, text: "SECTOR 2: DATA ARCHIVE BLACKOUT [MEDIUM]" });
+    this.addObstacle(130, 80, 90, 35, "desk");
+
+    // Cooling & Backup Hub Walls & Server Racks
+    this.addWall(820, 25, 20, 105);
+    this.addWall(820, 230, 20, 115);
+    this.addWall(820, 345, 455, 20);
+
+    this.addObstacle(890, 75, 140, 32, "server_rack");
+    this.addObstacle(1070, 75, 140, 32, "server_rack");
+    this.addObstacle(890, 175, 140, 32, "server_rack");
+    this.addObstacle(1070, 175, 140, 32, "server_rack");
+    this.addObstacle(970, 260, 150, 32, "server_rack");
+
+    // Archive Bay Walls & Battery Banks
+    this.addWall(25, 460, 370, 20);
+    this.addWall(375, 460, 20, 80);
+    this.addWall(375, 640, 20, 235);
+
+    this.addObstacle(70, 520, 120, 32, "server_rack");
+    this.addObstacle(70, 620, 120, 32, "server_rack");
+    this.addObstacle(70, 720, 120, 32, "server_rack");
+    this.addObstacle(250, 560, 32, 180, "server_rack");
+
+    // Exit Gate Walls
+    this.addWall(820, 550, 110, 20);
+    this.addWall(1040, 550, 235, 20);
+    this.addWall(820, 550, 20, 325);
+
+    // S-Curve Server Racks in Main Corridor (Winding path forces strategic evasion)
+    this.addObstacle(460, 120, 32, 170, "server_rack");
+    this.addObstacle(620, 220, 32, 180, "server_rack");
+    this.addObstacle(460, 390, 32, 170, "server_rack");
+    this.addObstacle(620, 480, 32, 180, "server_rack");
+
+    // Amber Auxiliary Lighting with heavier flicker
+    this.lights = [
+      { x: 200, y: 150, radius: 140, color: "rgba(255, 160, 40, 0.20)", flicker: 0.15 },
+      { x: 540, y: 180, radius: 130, color: "rgba(255, 140, 30, 0.18)", flicker: 0.35 },
+      { x: 670, y: 350, radius: 130, color: "rgba(255, 140, 30, 0.18)", flicker: 0.30 },
+      { x: 540, y: 550, radius: 130, color: "rgba(255, 140, 30, 0.18)", flicker: 0.38 },
+      { x: 1050, y: 160, radius: 160, color: "rgba(0, 210, 255, 0.16)", flicker: 0.20 },
+      { x: 200, y: 600, radius: 130, color: "rgba(255, 160, 40, 0.16)", flicker: 0.25 },
+      { x: 1050, y: 700, radius: 170, color: "rgba(255, 100, 40, 0.22)", flicker: 0.20 }
+    ];
+
+    this.decorations.push(
+      { type: "blood_stain", x: 420, y: 190, size: 32 },
+      { type: "blood_trail", x: 460, y: 190, w: 240, h: 10 },
+      { type: "blood_stain", x: 620, y: 440, size: 36 },
       { type: "hazard_sign", x: 830, y: 110 },
+      { type: "warning_text", x: 470, y: 340, text: "AUXILIARY POWER // BLACKOUT", color: "rgba(245, 158, 11, 0.45)" },
+      { type: "exit_sign", x: 985, y: 535 }
+    );
+  }
+
+  /* ------------------------------------------------------------------
+   * LEVEL 3 (HARD): Quarantine Purge - Bulkheads, specimen tanks & sirens
+   * ------------------------------------------------------------------ */
+  setupLevel3() {
+    this.rooms = [
+      { name: "DECON AIRLOCK A (Safe Zone)", x: 25, y: 25, w: 350, h: 280, color: "#190e0e" },
+      { name: "ALPHA SPECIMEN LAB (Contained)", x: 820, y: 25, w: 455, h: 320, color: "#200909" },
+      { name: "BIOHAZARD AUTOPSY WING", x: 25, y: 460, w: 350, h: 415, color: "#170a0e" },
+      { name: "FINAL EXTRACTION BULKHEAD", x: 850, y: 550, w: 425, h: 325, color: "#290c0c" },
+      { name: "CENTRAL CHOKEPOINT LABYRINTH", x: 375, y: 120, w: 445, h: 590, color: "#120608" }
+    ];
+
+    // Decon Airlock Walls & Console
+    this.addWall(375, 25, 20, 115);
+    this.addWall(375, 225, 20, 80);
+    this.addWall(25, 305, 370, 20);
+
+    this.addDecor({ type: "chalkboard", x: 60, y: 27, w: 260, h: 10, text: "SECTOR 3: QUARANTINE PURGE PROTOCOL [HARD]" });
+    this.addObstacle(130, 70, 80, 35, "desk");
+
+    // Alpha Specimen Lab Walls & Biohazard Tanks
+    this.addWall(820, 25, 20, 105);
+    this.addWall(820, 230, 20, 115);
+    this.addWall(820, 345, 455, 20);
+
+    this.addDecor({ type: "biohazard_tank", x: 910, y: 80, r: 24 });
+    this.addDecor({ type: "biohazard_tank", x: 1160, y: 80, r: 24 });
+    this.addDecor({ type: "biohazard_tank", x: 910, y: 230, r: 24 });
+    this.addDecor({ type: "biohazard_tank", x: 1160, y: 230, r: 24 });
+    this.addObstacle(970, 140, 120, 28, "hazard_bulkhead");
+
+    // Autopsy & Morgue Wing Walls & Tables
+    this.addWall(25, 460, 370, 20);
+    this.addWall(375, 460, 20, 80);
+    this.addWall(375, 640, 20, 235);
+
+    this.addObstacle(70, 520, 60, 85, "cot");
+    this.addObstacle(180, 520, 60, 85, "cot");
+    this.addObstacle(70, 680, 60, 85, "cot");
+    this.addObstacle(180, 680, 60, 85, "cot");
+    this.addDecor({ type: "biohazard_tank", x: 290, y: 740, r: 24 });
+
+    // Exit Gate Walls
+    this.addWall(820, 550, 110, 20);
+    this.addWall(1040, 550, 235, 20);
+    this.addWall(820, 550, 20, 325);
+
+    // Tactical Chokepoint Bulkheads & Specimen Tanks in Central Hall
+    this.addObstacle(375, 180, 110, 24, "hazard_bulkhead");
+    this.addObstacle(670, 260, 150, 24, "hazard_bulkhead");
+    this.addObstacle(440, 420, 140, 24, "hazard_bulkhead");
+    this.addObstacle(640, 540, 180, 24, "hazard_bulkhead");
+    this.addDecor({ type: "biohazard_tank", x: 420, y: 310, r: 22 });
+    this.addDecor({ type: "biohazard_tank", x: 740, y: 460, r: 22 });
+
+    // Pulsing Red Alarm Siren Klaxons
+    this.lights = [
+      { x: 200, y: 150, radius: 130, color: "rgba(255, 30, 30, 0.25)", isStrobe: true, flicker: 0.15 },
+      { x: 560, y: 190, radius: 140, color: "rgba(255, 30, 30, 0.28)", isStrobe: true, flicker: 0.20 },
+      { x: 560, y: 380, radius: 140, color: "rgba(255, 30, 30, 0.28)", isStrobe: true, flicker: 0.20 },
+      { x: 560, y: 620, radius: 140, color: "rgba(255, 30, 30, 0.28)", isStrobe: true, flicker: 0.20 },
+      { x: 1050, y: 160, radius: 160, color: "rgba(46, 204, 113, 0.18)", isStrobe: false, flicker: 0.10 },
+      { x: 200, y: 600, radius: 130, color: "rgba(255, 30, 30, 0.25)", isStrobe: true, flicker: 0.15 },
+      { x: 1050, y: 700, radius: 170, color: "rgba(255, 40, 40, 0.30)", isStrobe: true, flicker: 0.20 }
+    ];
+
+    this.decorations.push(
+      { type: "blood_stain", x: 400, y: 180, size: 45 },
+      { type: "blood_trail", x: 460, y: 180, w: 260, h: 14 },
+      { type: "blood_stain", x: 800, y: 180, size: 50 },
+      { type: "blood_stain", x: 580, y: 480, size: 55 },
+      { type: "hazard_sign", x: 830, y: 110 },
+      { type: "warning_text", x: 440, y: 350, text: "PURGE PROTOCOL // DECONTAMINATION", color: "rgba(239, 68, 68, 0.6)" },
       { type: "exit_sign", x: 985, y: 535 }
     );
   }
@@ -456,8 +702,8 @@ class CampusMap {
     this.walls.push({ x, y, w, h, isWall: true });
   }
 
-  addObstacle(x, y, w, h) {
-    this.walls.push({ x, y, w, h, isObstacle: true });
+  addObstacle(x, y, w, h, obstacleType = "generic") {
+    this.walls.push({ x, y, w, h, isObstacle: true, obstacleType });
   }
 
   addDecor(decor) {
@@ -465,35 +711,37 @@ class CampusMap {
   }
 
   draw(ctx) {
-    // 1. Draw Room Floors
+    // 1. Draw Room Floors with Environment Tile Pattern
     for (const room of this.rooms) {
-      ctx.fillStyle = room.color;
-      ctx.fillRect(room.x, room.y, room.w, room.h);
+      if (envTextures.floorPattern) {
+        ctx.fillStyle = envTextures.floorPattern;
+        ctx.fillRect(room.x, room.y, room.w, room.h);
 
-      // Floor grid lines
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
-      ctx.lineWidth = 1;
-      const tileSize = 40;
-      for (let tx = room.x; tx < room.x + room.w; tx += tileSize) {
-        ctx.beginPath();
-        ctx.moveTo(tx, room.y);
-        ctx.lineTo(tx, room.y + room.h);
-        ctx.stroke();
-      }
-      for (let ty = room.y; ty < room.y + room.h; ty += tileSize) {
-        ctx.beginPath();
-        ctx.moveTo(room.x, ty);
-        ctx.lineTo(room.x + room.w, ty);
-        ctx.stroke();
+        // Apply room-specific atmosphere tint
+        if (room.name.includes("CLASSROOM") || room.name.includes("SAFE ZONE") || room.name.includes("CONTROL") || room.name.includes("AIRLOCK A")) {
+          ctx.fillStyle = this.levelNum === 3 ? "rgba(25, 14, 14, 0.65)" : (this.levelNum === 2 ? "rgba(13, 17, 23, 0.55)" : "rgba(20, 24, 30, 0.38)");
+        } else if (room.name.includes("LAB") || room.name.includes("SECURITY") || room.name.includes("HUB")) {
+          ctx.fillStyle = this.levelNum === 3 ? "rgba(32, 9, 9, 0.75)" : (this.levelNum === 2 ? "rgba(13, 24, 36, 0.68)" : "rgba(14, 30, 22, 0.65)");
+        } else if (room.name.includes("INFIRMARY") || room.name.includes("ARCHIVE") || room.name.includes("AUTOPSY")) {
+          ctx.fillStyle = this.levelNum === 3 ? "rgba(23, 10, 14, 0.72)" : (this.levelNum === 2 ? "rgba(17, 22, 29, 0.62)" : "rgba(18, 22, 26, 0.55)");
+        } else if (room.name.includes("EXIT") || room.name.includes("BULKHEAD")) {
+          ctx.fillStyle = this.levelNum === 3 ? "rgba(41, 12, 12, 0.75)" : "rgba(32, 16, 18, 0.62)";
+        } else {
+          ctx.fillStyle = this.levelNum === 3 ? "rgba(18, 6, 8, 0.78)" : (this.levelNum === 2 ? "rgba(8, 11, 15, 0.72)" : "rgba(10, 14, 18, 0.65)");
+        }
+        ctx.fillRect(room.x, room.y, room.w, room.h);
+      } else {
+        ctx.fillStyle = room.color;
+        ctx.fillRect(room.x, room.y, room.w, room.h);
       }
 
-      // Room Name Label
-      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      // Room Name Label on floor
+      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
       ctx.font = "bold 13px Consolas, monospace";
       ctx.fillText(room.name, room.x + 20, room.y + 35);
     }
 
-    // 2. Draw Floor Blood & Hazards
+    // 2. Draw Floor Blood, Smartboard & Hazards
     for (const d of this.decorations) {
       if (d.type === "blood_stain") {
         ctx.fillStyle = "rgba(140, 15, 25, 0.65)";
@@ -507,15 +755,19 @@ class CampusMap {
         ctx.fillStyle = "rgba(130, 15, 25, 0.45)";
         ctx.fillRect(d.x, d.y, d.w, d.h);
       } else if (d.type === "chalkboard") {
-        ctx.fillStyle = "#1e3328";
-        ctx.fillRect(d.x, d.y, d.w, d.h);
-        ctx.strokeStyle = "#8d6e63";
+        // Digital Smartboard Display
+        ctx.fillStyle = "#0c1015";
+        ctx.fillRect(d.x, d.y, d.w, d.h + 2);
+        ctx.strokeStyle = "#4b5868";
         ctx.lineWidth = 2;
-        ctx.strokeRect(d.x, d.y, d.w, d.h);
-        ctx.fillStyle = "#d4ebd0";
-        ctx.font = "9px monospace";
-        ctx.fillText(d.text, d.x + 10, d.y + 8);
+        ctx.strokeRect(d.x, d.y, d.w, d.h + 2);
+
+        // Glowing digital alert text
+        ctx.fillStyle = "#ff4455";
+        ctx.font = "bold 9px monospace";
+        ctx.fillText(d.text, d.x + 8, d.y + 9);
       } else if (d.type === "biohazard_tank") {
+        // Glowing Specimen Containment Cylinder
         ctx.fillStyle = "#0f382c";
         ctx.beginPath();
         ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
@@ -523,9 +775,24 @@ class CampusMap {
         ctx.strokeStyle = "#2ecc71";
         ctx.lineWidth = 3;
         ctx.stroke();
+
+        // Inner glowing core
+        ctx.fillStyle = "rgba(46, 204, 113, 0.35)";
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = "#2ecc71";
         ctx.font = "14px sans-serif";
         ctx.fillText("☣", d.x - 7, d.y + 5);
+      } else if (d.type === "hazard_sign") {
+        ctx.fillStyle = "#f59e0b";
+        ctx.font = "bold 13px monospace";
+        ctx.fillText("⚠ BIOHAZARD", d.x, d.y);
+      } else if (d.type === "warning_text") {
+        ctx.fillStyle = d.color || "rgba(239, 68, 68, 0.45)";
+        ctx.font = "bold 15px Consolas, monospace";
+        ctx.fillText(d.text, d.x, d.y);
       } else if (d.type === "exit_sign") {
         ctx.fillStyle = "#ff2233";
         ctx.fillRect(d.x - 45, d.y - 12, 90, 24);
@@ -535,18 +802,82 @@ class CampusMap {
       }
     }
 
-    // 3. Draw Solid Walls & Obstacles
+    // 3. Draw Solid Walls & Distinct Obstacles (Desks / Server Racks / Bulkheads)
     for (const w of this.walls) {
       if (w.isObstacle) {
-        ctx.fillStyle = "#222a36";
-        ctx.fillRect(w.x, w.y, w.w, w.h);
-        ctx.strokeStyle = "#384556";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(w.x, w.y, w.w, w.h);
+        if (w.obstacleType === "server_rack") {
+          // Metallic Server Rack with Blinking Indicator LEDs
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(w.x, w.y, w.w, w.h);
+          ctx.strokeStyle = "#334155";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(w.x, w.y, w.w, w.h);
+
+          // Server slots & blinking LEDs
+          ctx.fillStyle = "#020617";
+          const slotH = 14;
+          for (let sy = w.y + 3; sy < w.y + w.h - 6; sy += slotH) {
+            ctx.fillRect(w.x + 2, sy, w.w - 4, Math.min(10, w.y + w.h - sy - 3));
+            const ledPhase = Math.floor((Date.now() / 320) + sy + w.x) % 3;
+            ctx.fillStyle = ledPhase === 0 ? "#10b981" : (ledPhase === 1 ? "#06b6d4" : "#f59e0b");
+            ctx.fillRect(w.x + 4, sy + 3, 3, 3);
+            ctx.fillStyle = (ledPhase + 1) % 3 === 0 ? "#10b981" : "#0284c7";
+            ctx.fillRect(w.x + 10, sy + 3, 3, 3);
+            ctx.fillStyle = "#020617";
+          }
+        } else if (w.obstacleType === "hazard_bulkhead") {
+          // Heavy Reinforced Steel Bulkhead with Yellow/Black Hazard Stripes
+          ctx.fillStyle = "#1e293b";
+          ctx.fillRect(w.x, w.y, w.w, w.h);
+          ctx.strokeStyle = "#f59e0b";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(w.x, w.y, w.w, w.h);
+
+          // Diagonal hazard warning stripes
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(w.x, w.y, w.w, w.h);
+          ctx.clip();
+          ctx.strokeStyle = "rgba(245, 158, 11, 0.45)";
+          ctx.lineWidth = 6;
+          for (let sx = -w.h; sx < w.w + w.h; sx += 18) {
+            ctx.beginPath();
+            ctx.moveTo(w.x + sx, w.y);
+            ctx.lineTo(w.x + sx + w.h, w.y + w.h);
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else if (w.obstacleType === "cot") {
+          // Medical Cot / Autopsy Slab
+          ctx.fillStyle = "#334155";
+          ctx.fillRect(w.x, w.y, w.w, w.h);
+          ctx.strokeStyle = "#64748b";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(w.x, w.y, w.w, w.h);
+          ctx.fillStyle = "#94a3b8";
+          ctx.fillRect(w.x + 4, w.y + 4, w.w - 8, 14);
+        } else if (envTextures.deskImg && envTextures.deskImg.complete && w.w > 50 && w.h < 50) {
+          // Photo-sourced wooden student desk
+          ctx.drawImage(envTextures.deskImg, w.x, w.y, w.w, w.h);
+          ctx.strokeStyle = "#4b3c30";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(w.x, w.y, w.w, w.h);
+          ctx.fillStyle = "#8a96a3";
+          ctx.fillRect(w.x + 4, w.y + 2, 4, w.h - 4);
+          ctx.fillRect(w.x + w.w - 8, w.y + 2, 4, w.h - 4);
+        } else {
+          // Standard obstacle
+          ctx.fillStyle = "#222a36";
+          ctx.fillRect(w.x, w.y, w.w, w.h);
+          ctx.strokeStyle = "#384556";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(w.x, w.y, w.w, w.h);
+        }
       } else {
-        ctx.fillStyle = "#1b212a";
+        // Walls with level-specific metal/concrete color
+        ctx.fillStyle = this.levelNum === 3 ? "#1e1315" : (this.levelNum === 2 ? "#141c26" : "#1b212a");
         ctx.fillRect(w.x, w.y, w.w, w.h);
-        ctx.strokeStyle = "#3f4d62";
+        ctx.strokeStyle = this.levelNum === 3 ? "#6b2126" : (this.levelNum === 2 ? "#254668" : "#3f4d62");
         ctx.lineWidth = 1;
         ctx.strokeRect(w.x, w.y, w.w, w.h);
       }
@@ -744,6 +1075,9 @@ class Player {
     if (this.invulnTimer > 0) return;
     this.health = Math.max(0, this.health - amount);
     this.invulnTimer = CONFIG.INVULN_TIME;
+    const shakeIntensity = (typeof gameSettings !== 'undefined' && gameSettings.screenShake === 'off') ? 0 :
+      ((typeof gameSettings !== 'undefined' && gameSettings.screenShake === 'reduced') ? 8 : 16);
+    camera.shake = shakeIntensity; // Camera impact shake
     audio.playBite();
 
     const damageOverlay = document.getElementById('damage-overlay');
@@ -1044,7 +1378,7 @@ darkCanvas.width = CONFIG.CANVAS_WIDTH;
 darkCanvas.height = CONFIG.CANVAS_HEIGHT;
 const darkCtx = darkCanvas.getContext('2d');
 
-const camera = { x: 0, y: 0 };
+const camera = { x: 0, y: 0, shake: 0 };
 const keys = {};
 const mouse = { x: CONFIG.CANVAS_WIDTH / 2, y: CONFIG.CANVAS_HEIGHT / 2 };
 
@@ -1120,6 +1454,10 @@ function setupLevelEntities(lvl) {
 
 // Start Level / Campaign
 function startLevel(lvl, keepHealth = false) {
+  if (lvl > 3) {
+    triggerVictory();
+    return;
+  }
   gameState.currentLevel = lvl;
   const cfg = getCurrentLevelConfig();
 
@@ -1133,7 +1471,7 @@ function startLevel(lvl, keepHealth = false) {
   const oldHealth = player ? player.health : CONFIG.MAX_HEALTH;
   player = new Player(120, 160);
   if (keepHealth && oldHealth > 0) {
-    player.health = Math.min(CONFIG.MAX_HEALTH, oldHealth + 20); // Small bonus for clearing level
+    player.health = Math.min(CONFIG.MAX_HEALTH, oldHealth + 25); // Small bonus for clearing level
   }
 
   setupLevelEntities(lvl);
@@ -1141,7 +1479,94 @@ function startLevel(lvl, keepHealth = false) {
   hideModals();
   updateObjectivesUI();
   updateHUD(0);
+  applyBrightness();
   showBanner(`${cfg.title} - ${cfg.description}`, "urgent");
+}
+
+const gameSettings = {
+  volume: 0.8,
+  sfx: true,
+  brightness: 1.0,
+  displayMode: 'windowed',
+  crtScanlines: true,
+  screenShake: 'intense'
+};
+
+function applyBrightness() {
+  const canvas = document.getElementById('gameCanvas');
+  if (canvas) {
+    canvas.style.filter = `brightness(${gameSettings.brightness})`;
+  }
+}
+
+const ALL_SCREENS = [
+  'screen-main-menu',
+  'screen-select-level',
+  'screen-settings',
+  'screen-guide',
+  'screen-pause',
+  'screen-exit',
+  'screen-gameover',
+  'screen-level-complete',
+  'screen-win'
+];
+
+let previousScreen = 'screen-main-menu';
+
+function showScreen(screenId) {
+  const overlay = document.getElementById('modal-overlay');
+  if (!screenId) {
+    if (overlay) overlay.classList.remove('modal-active');
+    ALL_SCREENS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+    return;
+  }
+
+  if (overlay) overlay.classList.add('modal-active');
+  ALL_SCREENS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (id === screenId) {
+        el.classList.remove('hidden');
+      } else {
+        el.classList.add('hidden');
+      }
+    }
+  });
+
+  // Focus default button in main menu
+  if (screenId === 'screen-main-menu') {
+    const playBtn = document.getElementById('btn-menu-play');
+    if (playBtn) highlightMenuButton(playBtn);
+  }
+}
+
+function hideModals() {
+  showScreen(null);
+}
+
+function pauseGame() {
+  if (gameState.mode === 'PLAYING') {
+    gameState.mode = 'PAUSED';
+    audio.playMenuHover();
+    showScreen('screen-pause');
+  }
+}
+
+function resumeGame() {
+  if (gameState.mode === 'PAUSED') {
+    gameState.mode = 'PLAYING';
+    audio.playMenuSelect();
+    hideModals();
+  }
+}
+
+function highlightMenuButton(btn) {
+  const allBtns = document.querySelectorAll('#screen-main-menu .menu-nav-btn');
+  allBtns.forEach(b => b.classList.remove('selected'));
+  if (btn) btn.classList.add('selected');
 }
 
 function initGame(startGameplay = true) {
@@ -1165,7 +1590,8 @@ function initGame(startGameplay = true) {
     hideModals();
     showBanner(`${cfg.title} - ${cfg.description}`, "normal");
   } else {
-    gameState.mode = "START";
+    gameState.mode = "MENU";
+    showScreen('screen-main-menu');
   }
 
   updateObjectivesUI();
@@ -1269,38 +1695,44 @@ function triggerLevelComplete() {
   audio.playLevelClear();
 
   const cfg = getCurrentLevelConfig();
-  const nextCfg = LEVEL_CONFIGS[gameState.currentLevel];
+  const nextLevelNum = gameState.currentLevel + 1;
+  const nextCfg = LEVEL_CONFIGS[nextLevelNum - 1];
 
-  document.getElementById('stat-level-num').textContent = `Level ${cfg.level} (${cfg.difficulty})`;
-  document.getElementById('stat-next-level').textContent = `${nextCfg.title} (${nextCfg.difficulty})`;
-  document.getElementById('stat-level-health').textContent = `${Math.ceil(player.health)}%`;
-  document.getElementById('level-next-hint').textContent = cfg.nextSectorHint;
+  const statLvl = document.getElementById('stat-level-num');
+  if (statLvl) statLvl.textContent = `Level ${cfg.level} (${cfg.difficulty})`;
+  const statNext = document.getElementById('stat-next-level');
+  if (statNext) statNext.textContent = nextCfg ? `${nextCfg.title} (${nextCfg.difficulty})` : 'All Sectors Cleared!';
+  const statHealth = document.getElementById('stat-level-health');
+  if (statHealth) statHealth.textContent = `${Math.ceil(player.health)}%`;
+  const nextHint = document.getElementById('level-next-hint');
+  if (nextHint) nextHint.textContent = cfg.nextSectorHint;
 
-  document.getElementById('screen-start').classList.add('hidden');
-  document.getElementById('screen-gameover').classList.add('hidden');
-  document.getElementById('screen-win').classList.add('hidden');
-  document.getElementById('screen-level-complete').classList.remove('hidden');
-  document.getElementById('modal-overlay').classList.add('modal-active');
+  const btnNext = document.getElementById('btn-next-level');
+  if (btnNext && nextCfg) {
+    btnNext.textContent = `ADVANCE TO LEVEL ${nextLevelNum}: ${nextCfg.difficulty.toUpperCase()} [SPACE / ENTER]`;
+  }
+
+  showScreen('screen-level-complete');
 }
 
 function triggerGameOver(cause) {
   gameState.mode = "GAMEOVER";
   audio.playGameOver();
 
-  document.getElementById('gameover-cause').textContent = cause;
+  const goCause = document.getElementById('gameover-cause');
+  if (goCause) goCause.textContent = cause;
   const cfg = getCurrentLevelConfig();
   const timeSpent = cfg.timeLimit - gameState.timeRemaining;
   const mins = Math.floor(timeSpent / 60);
   const secs = Math.floor(timeSpent % 60);
-  document.getElementById('stat-time-survived').textContent = `${mins}m ${secs}s (on Level ${gameState.currentLevel})`;
-  document.getElementById('stat-keycard-found').textContent = gameState.hasKeycard ? "Yes" : "No";
-  document.getElementById('stat-zombies-evaded').textContent = zombies.filter(z => z.state === "CHASE").length;
+  const statTime = document.getElementById('stat-time-survived');
+  if (statTime) statTime.textContent = `${mins}m ${secs}s (on Level ${gameState.currentLevel})`;
+  const statKey = document.getElementById('stat-keycard-found');
+  if (statKey) statKey.textContent = gameState.hasKeycard ? "Yes" : "No";
+  const statEvaded = document.getElementById('stat-zombies-evaded');
+  if (statEvaded) statEvaded.textContent = zombies.filter(z => z.state === "CHASE").length;
 
-  document.getElementById('screen-start').classList.add('hidden');
-  document.getElementById('screen-win').classList.add('hidden');
-  document.getElementById('screen-level-complete').classList.add('hidden');
-  document.getElementById('screen-gameover').classList.remove('hidden');
-  document.getElementById('modal-overlay').classList.add('modal-active');
+  showScreen('screen-gameover');
 }
 
 function triggerVictory() {
@@ -1310,26 +1742,17 @@ function triggerVictory() {
   const totalSecs = Math.floor(gameState.totalTimeElapsed);
   const mins = Math.floor(totalSecs / 60);
   const secs = totalSecs % 60;
-  document.getElementById('stat-win-time').textContent = `${mins}m ${secs}s`;
-  document.getElementById('stat-win-health').textContent = `${Math.ceil(player.health)}%`;
+  const statWinTime = document.getElementById('stat-win-time');
+  if (statWinTime) statWinTime.textContent = `${mins}m ${secs}s`;
+  const statWinHealth = document.getElementById('stat-win-health');
+  if (statWinHealth) statWinHealth.textContent = `${Math.ceil(player.health)}%`;
 
   let rating = "S - INFILTRATION MASTER";
   if (player.health < 40) rating = "A - SURVIVOR";
-  document.getElementById('stat-win-rating').textContent = rating;
+  const statWinRating = document.getElementById('stat-win-rating');
+  if (statWinRating) statWinRating.textContent = rating;
 
-  document.getElementById('screen-start').classList.add('hidden');
-  document.getElementById('screen-gameover').classList.add('hidden');
-  document.getElementById('screen-level-complete').classList.add('hidden');
-  document.getElementById('screen-win').classList.remove('hidden');
-  document.getElementById('modal-overlay').classList.add('modal-active');
-}
-
-function hideModals() {
-  document.getElementById('modal-overlay').classList.remove('modal-active');
-  document.getElementById('screen-start').classList.add('hidden');
-  document.getElementById('screen-gameover').classList.add('hidden');
-  document.getElementById('screen-level-complete').classList.add('hidden');
-  document.getElementById('screen-win').classList.add('hidden');
+  showScreen('screen-win');
 }
 
 /* ====================================================================
@@ -1463,7 +1886,9 @@ function gameLoop(now) {
     }
 
     // Check Victory / Sector Cleared Condition
-    if (gameState.hasKeycard && player.x >= 860 && player.y >= 570) {
+    const inExitArea = (player.x >= 860 && player.y >= 555) ||
+                       (player.x >= 920 && player.x <= 1060 && player.y >= 530 && player.y <= 620);
+    if (gameState.hasKeycard && inExitArea) {
       if (gameState.currentLevel < 3) {
         triggerLevelComplete();
       } else {
@@ -1492,19 +1917,25 @@ function gameLoop(now) {
       }
     }
 
-    // Smooth Camera Follow
+    // Smooth Camera Follow & Shake Decay
     camera.x = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - CONFIG.CANVAS_WIDTH, player.x - CONFIG.CANVAS_WIDTH / 2));
     camera.y = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - CONFIG.CANVAS_HEIGHT, player.y - CONFIG.CANVAS_HEIGHT / 2));
+
+    if (camera.shake > 0) {
+      camera.shake = Math.max(0, camera.shake - dt * 28);
+    }
 
     updateHUD(dt);
   }
 
-  // Render Pass
+  // Render Pass with Camera Shake
   ctx.save();
   ctx.fillStyle = "#05070a";
   ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
 
-  ctx.translate(-camera.x, -camera.y);
+  const shakeOffsetX = camera.shake > 0 ? (Math.random() - 0.5) * camera.shake : 0;
+  const shakeOffsetY = camera.shake > 0 ? (Math.random() - 0.5) * camera.shake : 0;
+  ctx.translate(-camera.x + shakeOffsetX, -camera.y + shakeOffsetY);
 
   if (map) {
     map.draw(ctx);
@@ -1542,33 +1973,141 @@ function gameLoop(now) {
   // Lighting & Darkness Pass
   if (gameState.mode === "PLAYING") {
     renderLighting();
+
+    // In-Game Aiming Reticle / Laser Crosshair (Screen space)
+    ctx.save();
+    const mx = mouse.x;
+    const my = mouse.y;
+    const worldMx = mouse.x + camera.x;
+    const worldMy = mouse.y + camera.y;
+    const hoverZombie = zombies.some(z => Math.hypot(z.x - worldMx, z.y - worldMy) < 32);
+
+    ctx.strokeStyle = hoverZombie ? "#ff3344" : "rgba(0, 210, 255, 0.8)";
+    ctx.lineWidth = 1.5;
+
+    const r = player && player.isSprinting ? 12 : 7;
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(mx - r - 4, my); ctx.lineTo(mx - r - 1, my);
+    ctx.moveTo(mx + r + 1, my); ctx.lineTo(mx + r + 4, my);
+    ctx.moveTo(mx, my - r - 4); ctx.lineTo(mx, my - r - 1);
+    ctx.moveTo(mx, my + r + 1); ctx.lineTo(mx, my + r + 4);
+    ctx.stroke();
+
+    ctx.fillStyle = hoverZombie ? "#ff1a30" : "#00d2ff";
+    ctx.beginPath();
+    ctx.arc(mx, my, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   requestAnimationFrame(gameLoop);
 }
 
+// Fullscreen Handler
+function toggleFullscreen() {
+  audio.init();
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+// Keep Fullscreen UI buttons in sync
+document.addEventListener('fullscreenchange', () => {
+  const isFull = !!document.fullscreenElement;
+  const btnFullscreen = document.getElementById('btn-fullscreen');
+  const settingDisplayMode = document.getElementById('setting-display-mode');
+
+  if (btnFullscreen) {
+    btnFullscreen.textContent = isFull ? "⛶ WINDOWED [F]" : "⛶ FULLSCREEN [F]";
+  }
+  if (settingDisplayMode) {
+    settingDisplayMode.textContent = isFull ? "FULLSCREEN [PRESS F]" : "WINDOWED [PRESS F]";
+    if (isFull) {
+      settingDisplayMode.classList.add('active');
+    } else {
+      settingDisplayMode.classList.remove('active');
+    }
+  }
+});
+
 /* ====================================================================
- * 10. INPUT LISTENERS & BUTTON HOOKS
+ * 10. INPUT LISTENERS & INTERACTIVE MENU HOOKS
  * ==================================================================== */
 window.addEventListener('keydown', (e) => {
   keys[e.code] = true;
 
-  // Space / Enter starts game from Start Screen
-  if ((e.code === 'Space' || e.code === 'Enter') && gameState.mode === 'START') {
-    audio.init();
-    initGame(true);
+  // 'F' key toggles Fullscreen
+  if (e.code === 'KeyF') {
+    toggleFullscreen();
+  }
+
+  // 'ESC' key toggles Pause or returns from Submenus
+  if (e.code === 'Escape') {
+    if (gameState.mode === 'PLAYING') {
+      pauseGame();
+    } else if (gameState.mode === 'PAUSED') {
+      resumeGame();
+    } else if (gameState.mode === 'MENU') {
+      const activeCard = document.querySelector('#modal-overlay .modal-card:not(.hidden)');
+      if (activeCard && activeCard.id !== 'screen-main-menu') {
+        audio.playMenuSelect();
+        showScreen(previousScreen || 'screen-main-menu');
+      }
+    }
+  }
+
+  // Keyboard Navigation on Main Menu (Up/Down or W/S + Enter/Space)
+  if (gameState.mode === 'MENU') {
+    const activeMainMenu = document.getElementById('screen-main-menu');
+    if (activeMainMenu && !activeMainMenu.classList.contains('hidden')) {
+      const navBtns = Array.from(activeMainMenu.querySelectorAll('.menu-nav-btn'));
+      const currentIndex = navBtns.findIndex(b => b.classList.contains('selected'));
+
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+        e.preventDefault();
+        audio.init();
+        const nextIndex = currentIndex < navBtns.length - 1 ? currentIndex + 1 : 0;
+        highlightMenuButton(navBtns[nextIndex]);
+        audio.playMenuHover();
+      } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        e.preventDefault();
+        audio.init();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : navBtns.length - 1;
+        highlightMenuButton(navBtns[prevIndex]);
+        audio.playMenuHover();
+      } else if (e.code === 'Enter' || e.code === 'Space') {
+        e.preventDefault();
+        if (currentIndex >= 0 && navBtns[currentIndex]) {
+          navBtns[currentIndex].click();
+        }
+      }
+    }
   }
 
   // Space / Enter advances to next level from Level Complete screen
   if ((e.code === 'Space' || e.code === 'Enter') && gameState.mode === 'LEVEL_COMPLETE') {
     audio.init();
+    audio.playMenuSelect();
     startLevel(gameState.currentLevel + 1, true);
   }
 
-  // 'R' restarts campaign from Game Over or Campaign Win
-  if (e.code === 'KeyR' && (gameState.mode === 'GAMEOVER' || gameState.mode === 'WIN')) {
-    audio.init();
-    initGame(true);
+  // 'R' retries sector from Game Over or Win screen
+  if (e.code === 'KeyR') {
+    if (gameState.mode === 'GAMEOVER') {
+      audio.init();
+      audio.playMenuSelect();
+      startLevel(gameState.currentLevel, false);
+    } else if (gameState.mode === 'WIN') {
+      audio.init();
+      audio.playMenuSelect();
+      startLevel(1, false);
+    }
   }
 });
 
@@ -1584,46 +2123,375 @@ canvas.addEventListener('mousemove', (e) => {
   mouse.y = (e.clientY - rect.top) * scaleY;
 });
 
-// Start button on title screen
-document.getElementById('btn-start').addEventListener('click', () => {
-  audio.init();
-  initGame(true);
-});
+/* --- A. MAIN MENU BUTTONS --- */
+const btnMenuPlay = document.getElementById('btn-menu-play');
+if (btnMenuPlay) {
+  btnMenuPlay.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(1, false);
+  });
+}
 
-// Next level button on Level Complete screen
+const btnMenuLevels = document.getElementById('btn-menu-levels');
+if (btnMenuLevels) {
+  btnMenuLevels.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    previousScreen = 'screen-main-menu';
+    showScreen('screen-select-level');
+  });
+}
+
+const btnMenuSettings = document.getElementById('btn-menu-settings');
+if (btnMenuSettings) {
+  btnMenuSettings.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    previousScreen = 'screen-main-menu';
+    showScreen('screen-settings');
+  });
+}
+
+const btnMenuGuide = document.getElementById('btn-menu-guide');
+if (btnMenuGuide) {
+  btnMenuGuide.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    previousScreen = 'screen-main-menu';
+    showScreen('screen-guide');
+  });
+}
+
+const btnMenuExit = document.getElementById('btn-menu-exit');
+if (btnMenuExit) {
+  btnMenuExit.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    previousScreen = 'screen-main-menu';
+    showScreen('screen-exit');
+  });
+}
+
+/* --- B. LEVEL / SECTOR SELECT --- */
+const btnSelectLvl1 = document.getElementById('btn-select-lvl1');
+if (btnSelectLvl1) {
+  btnSelectLvl1.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(1, false);
+  });
+}
+
+const btnSelectLvl2 = document.getElementById('btn-select-lvl2');
+if (btnSelectLvl2) {
+  btnSelectLvl2.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(2, false);
+  });
+}
+
+const btnSelectLvl3 = document.getElementById('btn-select-lvl3');
+if (btnSelectLvl3) {
+  btnSelectLvl3.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(3, false);
+  });
+}
+
+const btnLevelsBack = document.getElementById('btn-levels-back');
+if (btnLevelsBack) {
+  btnLevelsBack.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    showScreen('screen-main-menu');
+  });
+}
+
+/* --- C. SETTINGS & VISUALS --- */
+const settingVolume = document.getElementById('setting-volume');
+const volumeVal = document.getElementById('volume-val');
+if (settingVolume) {
+  settingVolume.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (volumeVal) volumeVal.textContent = `${val}%`;
+    gameSettings.volume = val / 100;
+    audio.init();
+    audio.setVolume(val / 100);
+  });
+  settingVolume.addEventListener('change', () => {
+    audio.playMenuHover();
+  });
+}
+
+const settingBrightness = document.getElementById('setting-brightness');
+const brightnessVal = document.getElementById('brightness-val');
+if (settingBrightness) {
+  settingBrightness.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (brightnessVal) brightnessVal.textContent = `${val}%`;
+    gameSettings.brightness = val / 100;
+    applyBrightness();
+  });
+  settingBrightness.addEventListener('change', () => {
+    audio.playMenuHover();
+  });
+}
+
+const settingSfx = document.getElementById('setting-sfx');
+if (settingSfx) {
+  settingSfx.addEventListener('click', () => {
+    audio.init();
+    const isMuted = audio.toggleMute();
+    gameSettings.sfx = !isMuted;
+    settingSfx.textContent = isMuted ? "MUTED" : "ENABLED";
+    settingSfx.className = isMuted ? "toggle-btn" : "toggle-btn active";
+    const btnAudio = document.getElementById('btn-audio');
+    if (btnAudio) btnAudio.textContent = isMuted ? "🔇 MUTED" : "🔊 AUDIO";
+    if (!isMuted) audio.playMenuSelect();
+  });
+}
+
+const settingDisplayMode = document.getElementById('setting-display-mode');
+if (settingDisplayMode) {
+  settingDisplayMode.addEventListener('click', () => {
+    toggleFullscreen();
+  });
+}
+
+const settingCrt = document.getElementById('setting-crt');
+if (settingCrt) {
+  settingCrt.addEventListener('click', () => {
+    audio.init();
+    gameSettings.crtScanlines = !gameSettings.crtScanlines;
+    const crt = document.getElementById('crt-overlay');
+    if (crt) crt.style.display = gameSettings.crtScanlines ? 'block' : 'none';
+    settingCrt.textContent = gameSettings.crtScanlines ? "ENABLED" : "DISABLED";
+    settingCrt.className = gameSettings.crtScanlines ? "toggle-btn active" : "toggle-btn";
+    audio.playMenuSelect();
+  });
+}
+
+const settingScreenshake = document.getElementById('setting-screenshake');
+if (settingScreenshake) {
+  settingScreenshake.addEventListener('click', () => {
+    audio.init();
+    if (gameSettings.screenShake === 'intense') {
+      gameSettings.screenShake = 'reduced';
+      settingScreenshake.textContent = 'REDUCED';
+      settingScreenshake.className = 'toggle-btn active';
+    } else if (gameSettings.screenShake === 'reduced') {
+      gameSettings.screenShake = 'off';
+      settingScreenshake.textContent = 'DISABLED';
+      settingScreenshake.className = 'toggle-btn';
+    } else {
+      gameSettings.screenShake = 'intense';
+      settingScreenshake.textContent = 'INTENSE';
+      settingScreenshake.className = 'toggle-btn active';
+    }
+    audio.playMenuSelect();
+  });
+}
+
+const btnSettingsBack = document.getElementById('btn-settings-back');
+if (btnSettingsBack) {
+  btnSettingsBack.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    showScreen(previousScreen || 'screen-main-menu');
+  });
+}
+
+/* --- D. SURVIVAL GUIDE --- */
+const btnGuideBack = document.getElementById('btn-guide-back');
+if (btnGuideBack) {
+  btnGuideBack.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    showScreen('screen-main-menu');
+  });
+}
+
+/* --- E. PAUSE MENU --- */
+const btnPauseResume = document.getElementById('btn-pause-resume');
+if (btnPauseResume) {
+  btnPauseResume.addEventListener('click', () => {
+    resumeGame();
+  });
+}
+
+const btnPauseRestart = document.getElementById('btn-pause-restart');
+if (btnPauseRestart) {
+  btnPauseRestart.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(gameState.currentLevel, false);
+  });
+}
+
+const btnPauseSettings = document.getElementById('btn-pause-settings');
+if (btnPauseSettings) {
+  btnPauseSettings.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    previousScreen = 'screen-pause';
+    showScreen('screen-settings');
+  });
+}
+
+const btnPauseMenu = document.getElementById('btn-pause-menu');
+if (btnPauseMenu) {
+  btnPauseMenu.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    gameState.mode = 'MENU';
+    showScreen('screen-main-menu');
+  });
+}
+
+/* --- F. EXIT MODAL --- */
+function executeExit() {
+  audio.init();
+  audio.playMenuSelect();
+
+  try { window.close(); } catch (e) {}
+  try { window.open('', '_self', ''); window.close(); } catch (e) {}
+  try { window.top.close(); } catch (e) {}
+
+  setTimeout(() => {
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) {
+      overlay.className = 'modal-active';
+      overlay.style.backgroundColor = 'rgba(2, 4, 8, 0.98)';
+      overlay.innerHTML = `
+        <div style="text-align:center; padding: 36px; color:#ffffff; font-family:var(--font-mono); max-width:520px; border:2px solid #ff3344; background:#0a0d14; border-radius:8px; box-shadow:0 0 40px rgba(255,51,68,0.7); animation:menu-slide-in 0.4s ease;">
+          <div style="font-size:30px; font-weight:900; color:#ff3344; letter-spacing:4px; margin-bottom:12px;">SESSION TERMINATED</div>
+          <div style="font-size:13px; color:#00d2ff; letter-spacing:2px; margin-bottom:18px;">[NOT DEAD YET // PROTOCOL OFFLINE]</div>
+          <p style="color:#94a3b8; font-size:13px; line-height:1.6; margin-bottom:24px;">The campus quarantine survival simulation has ended. You can safely close this window or tab.</p>
+          <button id="btn-force-close" class="cta-btn danger" style="padding:12px 28px; font-size:14px; cursor:pointer;">CLOSE TAB NOW</button>
+        </div>
+      `;
+      const btnForce = document.getElementById('btn-force-close');
+      if (btnForce) {
+        btnForce.addEventListener('click', () => {
+          try { window.open('', '_self', ''); window.close(); } catch (e) {}
+          try { window.location.replace('about:blank'); } catch (e) {}
+        });
+      }
+    }
+  }, 100);
+}
+
+const btnExitConfirm = document.getElementById('btn-exit-confirm');
+if (btnExitConfirm) {
+  btnExitConfirm.addEventListener('click', executeExit);
+}
+
+const btnExitCancel = document.getElementById('btn-exit-cancel');
+if (btnExitCancel) {
+  btnExitCancel.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    showScreen('screen-main-menu');
+  });
+}
+
+/* --- G. LEVEL COMPLETE, GAME OVER & WIN MODALS --- */
 const btnNextLevel = document.getElementById('btn-next-level');
 if (btnNextLevel) {
   btnNextLevel.addEventListener('click', () => {
     audio.init();
+    audio.playMenuSelect();
     startLevel(gameState.currentLevel + 1, true);
   });
 }
 
-// Retry button on Game Over screen
-document.getElementById('btn-retry').addEventListener('click', () => {
-  audio.init();
-  initGame(true);
-});
+const btnRetry = document.getElementById('btn-retry');
+if (btnRetry) {
+  btnRetry.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(gameState.currentLevel, false);
+  });
+}
 
-// Play Again button on Win screen
-document.getElementById('btn-play-again').addEventListener('click', () => {
-  audio.init();
-  initGame(true);
-});
+const btnGameoverMenu = document.getElementById('btn-gameover-menu');
+if (btnGameoverMenu) {
+  btnGameoverMenu.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    gameState.mode = 'MENU';
+    showScreen('screen-main-menu');
+  });
+}
 
-// Quick Restart Button in footer
-document.getElementById('btn-restart-quick').addEventListener('click', () => {
-  audio.init();
-  initGame(true);
-});
+const btnPlayAgain = document.getElementById('btn-play-again');
+if (btnPlayAgain) {
+  btnPlayAgain.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(1, false);
+  });
+}
 
-// Audio Toggle Button
+const btnWinMenu = document.getElementById('btn-win-menu');
+if (btnWinMenu) {
+  btnWinMenu.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    gameState.mode = 'MENU';
+    showScreen('screen-main-menu');
+  });
+}
+
+/* --- H. FOOTER BUTTONS --- */
+const btnFullscreen = document.getElementById('btn-fullscreen');
+if (btnFullscreen) {
+  btnFullscreen.addEventListener('click', toggleFullscreen);
+}
+
+const btnRestartQuick = document.getElementById('btn-restart-quick');
+if (btnRestartQuick) {
+  btnRestartQuick.addEventListener('click', () => {
+    audio.init();
+    audio.playMenuSelect();
+    startLevel(gameState.currentLevel, false);
+  });
+}
+
 const btnAudio = document.getElementById('btn-audio');
-btnAudio.addEventListener('click', () => {
-  audio.init();
-  const isMuted = audio.toggleMute();
-  btnAudio.textContent = isMuted ? "🔇 MUTED" : "🔊 AUDIO";
+if (btnAudio) {
+  btnAudio.addEventListener('click', () => {
+    audio.init();
+    const isMuted = audio.toggleMute();
+    btnAudio.textContent = isMuted ? "🔇 MUTED" : "🔊 AUDIO";
+    if (settingSfx) {
+      settingSfx.textContent = isMuted ? "MUTED" : "ENABLED";
+      settingSfx.className = isMuted ? "toggle-btn" : "toggle-btn active";
+    }
+    if (!isMuted) audio.playMenuSelect();
+  });
+}
+
+/* --- I. HOVER ACOUSTIC BLIPS & DYNAMIC GLOW SELECTION --- */
+const interactiveButtons = document.querySelectorAll('.menu-nav-btn, .sector-card, .cta-btn, .hud-btn');
+interactiveButtons.forEach(btn => {
+  btn.addEventListener('mouseenter', () => {
+    audio.init();
+    audio.playMenuHover();
+    if (btn.classList.contains('menu-nav-btn')) {
+      highlightMenuButton(btn);
+    }
+  });
 });
+
+// Set main menu background dynamically if base64 asset is available
+const mainMenuScreen = document.getElementById('screen-main-menu');
+if (mainMenuScreen && typeof ENV_ASSETS !== 'undefined' && ENV_ASSETS.mainMenuBg) {
+  mainMenuScreen.style.backgroundImage = `linear-gradient(to right, rgba(5, 7, 10, 0.94) 0%, rgba(8, 12, 18, 0.80) 50%, rgba(5, 7, 10, 0.90) 100%), url('${ENV_ASSETS.mainMenuBg}')`;
+}
 
 // Setup Initial State & Start Loop
 initGame(false);

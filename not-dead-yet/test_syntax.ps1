@@ -21,3 +21,4 @@ function Test-FileSyntax($path) {
 
 Test-FileSyntax "game.js"
 Test-FileSyntax "assets\player_sprites.js"
+Test-FileSyntax "assets\env_sprites.js"

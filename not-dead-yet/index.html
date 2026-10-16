@@ -69,55 +69,235 @@
       
       <!-- Damage vignette overlay -->
       <div id="damage-overlay"></div>
+      
+      <!-- CRT Monitor Scanlines & Vignette -->
+      <div id="crt-overlay"></div>
     </div>
 
     <!-- Bottom Controls & Hints Bar -->
     <footer id="controls-bar">
-      <span><strong>WASD / Arrows:</strong> Move</span>
-      <span><strong>SHIFT:</strong> Sprint (Makes Noise!)</span>
-      <span><strong>MOUSE:</strong> Aim Flashlight</span>
-      <span><strong>E / Walk Over:</strong> Collect Items</span>
+      <span><strong>WASD:</strong> Move</span>
+      <span><strong>SHIFT:</strong> Sprint</span>
+      <span><strong>MOUSE:</strong> Aim</span>
+      <button id="btn-fullscreen" class="hud-btn" title="Toggle Fullscreen (F)">⛶ FULLSCREEN [F]</button>
       <button id="btn-audio" class="hud-btn" title="Toggle Sound">🔊 AUDIO</button>
       <button id="btn-restart-quick" class="hud-btn" title="Restart Game">🔄 RESTART</button>
     </footer>
 
-    <!-- Overlay Screens (Start / Game Over / Victory) -->
+    <!-- Overlay Screens (Main Menu, Level Select, Settings, Pause, Game Over, Win) -->
     <div id="modal-overlay" class="modal-active">
-      <!-- Start Screen -->
-      <div id="screen-start" class="modal-card">
-        <div class="glitch-title" data-text="NOT DEAD YET">NOT DEAD YET</div>
-        <p class="tagline">SURVIVE THE CAMPUS LOCKDOWN</p>
-        
-        <div class="story-brief">
-          <p>An outbreak occurred in <strong>Research Lab B</strong>. The campus is quarantined and scheduled for a purge decontamination.</p>
-          <p><strong>Your Mission:</strong> Search the campus, recover the <strong>Security Keycard</strong> in the Lab, avoid or outsmart the infected, and escape through the <strong>Main Exit Gate</strong> before time runs out.</p>
+      <!-- 1. CINEMATIC MAIN MENU -->
+      <div id="screen-main-menu" class="fullscreen-menu">
+        <div class="menu-content-wrap">
+          <div class="menu-branding">
+            <div class="glitch-title" data-text="NOT DEAD YET">NOT DEAD YET</div>
+            <div class="campus-title-badge">JAWAHARLAL NEHRU ENGINEERING COLLEGE</div>
+            <p class="tagline">CAMPUS LOCKDOWN // SURVIVAL PROTOCOL</p>
+          </div>
+
+          <div class="menu-options-list">
+            <button class="menu-nav-btn primary" id="btn-menu-play">
+              <span class="btn-bullet">▶</span>
+              <span class="btn-text">PLAY CAMPAIGN</span>
+              <span class="btn-subtext">Level 1: Classroom Outbreak</span>
+            </button>
+
+            <button class="menu-nav-btn" id="btn-menu-levels">
+              <span class="btn-bullet">▶</span>
+              <span class="btn-text">SELECT SECTOR</span>
+              <span class="btn-subtext">Choose Difficulty (Easy / Medium / Hard)</span>
+            </button>
+
+            <button class="menu-nav-btn" id="btn-menu-settings">
+              <span class="btn-bullet">▶</span>
+              <span class="btn-text">SETTINGS & AUDIO</span>
+              <span class="btn-subtext">Volume, Display & CRT Visuals</span>
+            </button>
+
+            <button class="menu-nav-btn" id="btn-menu-guide">
+              <span class="btn-bullet">▶</span>
+              <span class="btn-text">SURVIVAL GUIDE</span>
+              <span class="btn-subtext">Noise Mechanics & Evacuation Intel</span>
+            </button>
+
+            <button class="menu-nav-btn danger" id="btn-menu-exit">
+              <span class="btn-bullet">▶</span>
+              <span class="btn-text">EXIT GAME</span>
+              <span class="btn-subtext">Quit to Desktop</span>
+            </button>
+          </div>
+
+          <div class="menu-footer-hint">
+            <span>[W/S / ARROWS]: Navigate</span>
+            <span>[ENTER / CLICK]: Select</span>
+            <span>[F]: Fullscreen</span>
+          </div>
         </div>
+      </div>
+
+      <!-- 2. SECTOR / LEVEL SELECT SUBMENU -->
+      <div id="screen-select-level" class="modal-card hidden">
+        <h2 class="menu-card-title">SELECT SECTOR DIFFICULTY</h2>
+        <p class="menu-card-subtitle">Choose an infiltration point on the university campus.</p>
+
+        <div class="sector-cards-grid">
+          <div class="sector-card easy" id="btn-select-lvl1">
+            <div class="sector-badge easy">SECTOR 1 [EASY]</div>
+            <h3>CLASSROOM OUTBREAK</h3>
+            <p>Classroom 101 evacuated. 3 patrol infected, standard emergency lighting, 2 First-Aid kits.</p>
+            <div class="sector-stats">
+              <span>⏱ 200s Limit</span>
+              <span>⚡ 16 Bite DMG</span>
+              <span>🔦 320px Beam</span>
+            </div>
+            <button class="cta-btn small success">INFILTRATE SECTOR 1</button>
+          </div>
+
+          <div class="sector-card medium" id="btn-select-lvl2">
+            <div class="sector-badge medium">SECTOR 2 [MEDIUM]</div>
+            <h3>THE BLACKOUT</h3>
+            <p>Generators failed. 5 aggressive stalkers roaming, pitch-black hallways, 1 First-Aid kit.</p>
+            <div class="sector-stats">
+              <span>⏱ 160s Limit</span>
+              <span>⚡ 22 Bite DMG</span>
+              <span>🔦 260px Beam</span>
+            </div>
+            <button class="cta-btn small warning">INFILTRATE SECTOR 2</button>
+          </div>
+
+          <div class="sector-card hard" id="btn-select-lvl3">
+            <div class="sector-badge hard">SECTOR 3 [HARD]</div>
+            <h3>QUARANTINE PURGE</h3>
+            <p>Total decontamination purge. 7 mutant berserkers, red sirens, high noise sensitivity!</p>
+            <div class="sector-stats">
+              <span>⏱ 120s Limit</span>
+              <span>⚡ 30 Bite DMG</span>
+              <span>🔦 220px Beam</span>
+            </div>
+            <button class="cta-btn small danger">INFILTRATE SECTOR 3</button>
+          </div>
+        </div>
+
+        <button class="menu-nav-btn back" id="btn-levels-back">◀ RETURN TO MAIN MENU</button>
+      </div>
+
+      <!-- 3. SETTINGS & VISUALS MENU -->
+      <div id="screen-settings" class="modal-card hidden">
+        <h2 class="menu-card-title">SETTINGS & VISUALS</h2>
+        <p class="menu-card-subtitle">Configure audio volume, display, and retro monitor effects.</p>
+
+        <div class="settings-grid">
+          <div class="setting-row">
+            <div class="setting-info">
+              <label>MASTER VOLUME</label>
+              <span>Control synthesized sound effects and alerts</span>
+            </div>
+            <div class="setting-control">
+              <input type="range" id="setting-volume" min="0" max="100" value="80" class="game-slider">
+              <span id="volume-val" class="setting-value">80%</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label>DISPLAY BRIGHTNESS</label>
+              <span>Adjust ambient gamma and flashlight visibility</span>
+            </div>
+            <div class="setting-control">
+              <input type="range" id="setting-brightness" min="50" max="150" value="100" class="game-slider">
+              <span id="brightness-val" class="setting-value">100%</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label>SOUND EFFECTS (SFX)</label>
+              <span>Footsteps, bites, chimes, heartbeats</span>
+            </div>
+            <button id="setting-sfx" class="toggle-btn active">ENABLED</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label>DISPLAY MODE</label>
+              <span>Toggle true borderless fullscreen display</span>
+            </div>
+            <button id="setting-display-mode" class="toggle-btn">WINDOWED [PRESS F]</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label>CRT MONITOR SCANLINES</label>
+              <span>Retro surveillance monitor phosphor lines</span>
+            </div>
+            <button id="setting-crt" class="toggle-btn active">ENABLED</button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <label>CAMERA SCREEN SHAKE</label>
+              <span>Violent impact trauma shake when attacked</span>
+            </div>
+            <button id="setting-screenshake" class="toggle-btn active">INTENSE</button>
+          </div>
+        </div>
+
+        <button class="menu-nav-btn back" id="btn-settings-back">◀ SAVE & RETURN TO MAIN MENU</button>
+      </div>
+
+      <!-- 4. SURVIVAL GUIDE MENU -->
+      <div id="screen-guide" class="modal-card hidden">
+        <h2 class="menu-card-title">CAMPUS SURVIVAL INTEL</h2>
+        <p class="menu-card-subtitle">Infiltration procedures and survival rules.</p>
 
         <div class="instructions-grid">
           <div class="inst-col">
-            <h4>SURVIVAL TIPS</h4>
+            <h4>STEALTH & NOISE RULES</h4>
             <ul>
-              <li><strong>Walking (WASD):</strong> Quiet, slow, saves stamina.</li>
-              <li><strong>Sprinting (SHIFT):</strong> Fast, drains stamina, and <em>alerts zombies from far away!</em></li>
-              <li><strong>Flashlight:</strong> Reveals rooms in the dark, aim with mouse.</li>
-              <li><strong>Health Kit:</strong> First-Aid kit located in the Medical Bay.</li>
+              <li><strong>Walking (WASD):</strong> Quiet footsteps (110px). Zombies only detect direct line of sight.</li>
+              <li><strong>Sprinting (Hold SHIFT):</strong> Fast speed, drains stamina, <em>creates loud expanding noise ripples (360px+)</em> that alert zombies through doors and walls!</li>
+              <li><strong>Flashlight:</strong> Aim with your mouse. Zombies turn towards moving noise.</li>
             </ul>
           </div>
           <div class="inst-col">
-            <h4>ENEMY BEHAVIOR</h4>
+            <h4>OBJECTIVES & PROTOCOL</h4>
             <ul>
-              <li>Zombies patrol corridors and the lab.</li>
-              <li>They hunt by sight and <em>sound</em>.</li>
-              <li>If they hear sprinting footsteps, they will investigate!</li>
-              <li>Contact causes heavy damage.</li>
+              <li><strong>Classroom 101:</strong> Starting safe zone. Evacuate through the east door.</li>
+              <li><strong>Research Lab B:</strong> Find the glowing cyan <strong>Security Keycard</strong>.</li>
+              <li><strong>Campus Exit:</strong> Proceed south-east to unlock the heavy security gate before purge!</li>
+              <li><strong>First Aid:</strong> Find Medical Kits in the Infirmary to restore 45 HP.</li>
             </ul>
           </div>
         </div>
 
-        <button id="btn-start" class="cta-btn pulse">START RUN [PRESS SPACE / ENTER]</button>
+        <button class="menu-nav-btn back" id="btn-guide-back">◀ RETURN TO MAIN MENU</button>
       </div>
 
-      <!-- Game Over Screen -->
+      <!-- 5. IN-GAME PAUSE MENU (ESC KEY) -->
+      <div id="screen-pause" class="modal-card pause-modal hidden">
+        <h2 class="pause-title">GAME PAUSED</h2>
+        <p class="pause-subtitle">Quarantine purge timer suspended.</p>
+
+        <div class="pause-options">
+          <button class="menu-nav-btn primary" id="btn-pause-resume">▶ RESUME INFILTRATION</button>
+          <button class="menu-nav-btn" id="btn-pause-restart">🔄 RESTART CURRENT SECTOR</button>
+          <button class="menu-nav-btn" id="btn-pause-settings">⚙ SETTINGS & VISUALS</button>
+          <button class="menu-nav-btn danger" id="btn-pause-menu">◀ RETURN TO MAIN MENU</button>
+        </div>
+      </div>
+
+      <!-- 6. EXIT DIALOG MODAL -->
+      <div id="screen-exit" class="modal-card hidden">
+        <h2 class="danger-title">EXIT SIMULATION?</h2>
+        <p class="danger-subtitle">Are you sure you want to quit the lockdown run?</p>
+        <p class="hint-text">If running in standalone window mode, clicking Quit will close the window. Otherwise, close this browser tab.</p>
+        <div style="display:flex; gap:12px; justify-content:center; margin-top:10px;">
+          <button class="cta-btn danger" id="btn-exit-confirm">QUIT TO DESKTOP</button>
+          <button class="cta-btn success" id="btn-exit-cancel">STAY & SURVIVE</button>
+        </div>
+      </div>
+
+      <!-- 7. Game Over Screen -->
       <div id="screen-gameover" class="modal-card hidden">
         <h2 class="danger-title">YOU DID NOT SURVIVE</h2>
         <p id="gameover-cause" class="danger-subtitle">The infected caught you.</p>
@@ -129,10 +309,13 @@
         </div>
 
         <p class="hint-text">Tip: Don't sprint constantly in tight corridors! Zombies hear you through walls.</p>
-        <button id="btn-retry" class="cta-btn danger">RETRY RUN [PRESS R]</button>
+        <div style="display:flex; gap:12px; justify-content:center;">
+          <button id="btn-retry" class="cta-btn danger">RETRY SECTOR [PRESS R]</button>
+          <button id="btn-gameover-menu" class="cta-btn">MAIN MENU</button>
+        </div>
       </div>
 
-      <!-- Level Complete Screen -->
+      <!-- 8. Level Complete Screen -->
       <div id="screen-level-complete" class="modal-card hidden">
         <h2 class="level-clear-title">SECTOR CLEARED!</h2>
         <p id="level-complete-msg" class="level-clear-subtitle">You unlocked the exit and escaped the floor.</p>
@@ -147,7 +330,7 @@
         <button id="btn-next-level" class="cta-btn success pulse">ADVANCE TO NEXT LEVEL [PRESS SPACE / ENTER]</button>
       </div>
 
-      <!-- Win / Victory Screen (Campaign Beaten) -->
+      <!-- 9. Win / Victory Screen (Campaign Beaten) -->
       <div id="screen-win" class="modal-card hidden">
         <h2 class="victory-title">CAMPAIGN SURVIVED!</h2>
         <p class="victory-subtitle">You conquered all 3 levels and escaped the entire university campus.</p>
@@ -160,12 +343,16 @@
         </div>
 
         <p class="hint-text">Outstanding performance! You completed the entire hackathon survival run.</p>
-        <button id="btn-play-again" class="cta-btn success">REPLAY CAMPAIGN [PRESS R]</button>
+        <div style="display:flex; gap:12px; justify-content:center;">
+          <button id="btn-play-again" class="cta-btn success">REPLAY CAMPAIGN [PRESS R]</button>
+          <button id="btn-win-menu" class="cta-btn">MAIN MENU</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="assets/player_sprites.js"></script>
+  <script src="assets/env_sprites.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
